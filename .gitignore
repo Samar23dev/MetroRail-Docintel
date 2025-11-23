@@ -1,0 +1,424 @@
+# ========================================
+# 🚫 KMRL Document Intelligence System
+# Comprehensive .gitignore Configuration
+# ========================================
+
+# ========================================
+# 📦 Dependencies
+# ========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ========================================
+# 🔨 Build & Distribution
+# ========================================
+dist/
+dist-ssr/
+*.local
+build/
+out/
+
+# ========================================
+# 🎯 Vite & Development
+# ========================================
+.vite/
+.viteignore
+vite-env.d.ts
+
+# ========================================
+# 🐍 Python & Backend
+# ========================================
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+cover/
+htmlcov/
+
+# Virtual environments
+.venv
+.env
+.env.local
+.env.*.local
+
+# ========================================
+# 📊 Database & Data
+# ========================================
+*.db
+*.sqlite
+*.sqlite3
+mongodb.log
+data/
+dumps/
+backups/
+*.bak
+
+# ========================================
+# 📝 Logs
+# ========================================
+logs/
+*.log
+npm-debug.log
+npm-error.log
+yarn-debug.log
+yarn-error.log
+debug.log
+server.log
+client.log
+error.log
+combined.log
+
+# ========================================
+# 🔐 Environment & Secrets
+# ========================================
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.example.local
+secrets/
+.credentials
+.api_keys
+
+# ========================================
+# 📁 IDE & Editor Configuration
+# ========================================
+.vscode/
+.idea/
+.DS_Store
+.AppleDouble
+.LSOverride
+.swp
+.swo
+*~
+.project
+.pydevproject
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.sublime-project
+.history/
+.ionide/
+.vscode-test
+.vscode-test-server
+
+# ========================================
+# 🐛 Debug & Testing
+# ========================================
+.nyc_output/
+coverage/
+*.lcov
+.jest/
+.mocha/
+test-results/
+junit.xml
+
+# ========================================
+# 📤 Upload & Temporary Files
+# ========================================
+uploads/
+backend/uploads/
+temp/
+tmp/
+tempfiles/
+cache/
+*.tmp
+*.temp
+.cache/
+.DS_Store
+
+# ========================================
+# 📦 Dependency & Package Files
+# ========================================
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ========================================
+# 🔍 Search & Index
+# ========================================
+.eslintcache
+.stylelintcache
+elasticsearch/
+.solr/
+.searchindex
+
+# ========================================
+# 🖼️ OS-Specific Files
+# ========================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.directory
+
+# ========================================
+# 💾 Backup & Archive Files
+# ========================================
+*.bak
+*.backup
+*.old
+*.orig
+*.swp
+*.swo
+*~
+*.tar
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# ========================================
+# 📄 Document Processing Files
+# ========================================
+# Extracted/processed documents
+extracted_text/
+processed_documents/
+ocr_output/
+*.pdf.txt
+*.docx.txt
+
+# ========================================
+# 🖼️ Generated Image Files
+# ========================================
+screenshots/
+generated_images/
+thumbnail_cache/
+image_tmp/
+
+# ========================================
+# 🔗 Git
+# ========================================
+.git
+.gitmodules
+.gitattributes
+
+# ========================================
+# 🐳 Docker
+# ========================================
+.dockerignore
+docker-compose.override.yml
+docker-sync.yml
+.docker/
+
+# ========================================
+# ☸️ Kubernetes
+# ========================================
+k8s/
+helm/
+*.yaml
+*.yml
+!src/**/*.yaml
+!src/**/*.yml
+
+# ========================================
+# 📋 CI/CD
+# ========================================
+.github/workflows/*.log
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+coverage-report/
+
+# ========================================
+# 📚 Documentation Build Files
+# ========================================
+docs/_build/
+site/
+_site/
+.docs/
+.hugo_build.lock
+
+# ========================================
+# 🎨 Style & Build Cache
+# ========================================
+.sass-cache/
+.less-cache/
+.csscomb.cache
+
+# ========================================
+# 📱 Mobile & Native
+# ========================================
+android/
+ios/
+cordova/
+.gradle/
+.m2/
+local.properties
+
+# ========================================
+# 🔧 Build Tools
+# ========================================
+.gradle
+.nuxt
+dist
+.cache/
+.next
+out/
+.nuxt/
+
+# ========================================
+# 💻 System Files
+# ========================================
+.env.example
+.bowerrc
+bower_components/
+client/bower_components/
+
+# ========================================
+# 📊 Analytics & Monitoring
+# ========================================
+analytics/
+metrics/
+monitoring_logs/
+.datadog/
+
+# ========================================
+# 🎭 Testing Results
+# ========================================
+test-results/
+test_screenshots/
+test_videos/
+cypress/downloads/
+cypress/screenshots/
+cypress/videos/
+
+# ========================================
+# 🔐 SSL & Certificates
+# ========================================
+*.pem
+*.crt
+*.key
+*.cer
+certificates/
+ssl/
+
+# ========================================
+# 📦 Package Manager Cache
+# ========================================
+.npm-cache/
+.gem/
+.bundle/
+vendor/
+gems/
+
+# ========================================
+# 🌐 Web Server
+# ========================================
+www/
+public/uploads/
+server/uploads/
+nginx/logs/
+apache/logs/
+
+# ========================================
+# 📊 Database Files
+# ========================================
+*.sql
+dump.sql
+backup.sql
+mongodb/
+postgres/
+mysql/
+
+# ========================================
+# 💾 Cache Files
+# ========================================
+.cache
+.eslintcache
+.firebase/
+.nuxt
+dist
+.cache/
+.vuepress/dist
+
+# ========================================
+# 📁 Project-Specific
+# ========================================
+# KMRL specific files
+backend/uploads/
+backend/logs/
+backend/config/private/
+src/assets/temp/
+.consolidation_complete.txt
+CONSOLIDATION_COMPLETE.txt
+
+# ========================================
+# 📝 Temporary Documentation
+# ========================================
+*.tmp.md
+temp_*.md
+draft_*.md
+
+# ========================================
+# 🎯 IDE Run Configurations
+# ========================================
+.run/
+.idea/runConfigurations/
+
+# ========================================
+# 🔍 Lock Files (Environment Specific)
+# ========================================
+.lock
+*-lock.json
+Gemfile.lock
+
+# ========================================
+# 🚀 Deployment Files
+# ========================================
+deployment/logs/
+.heroku/
+.vercel/
+.netlify/
+now.json
+
+# ========================================
+# 📚 Virtual Environment Activation
+# ========================================
+bin/activate
+scripts/activate
+
+# Keep Important Files
+# ========================================
+!.gitkeep
+!.env.example
+!.github/
+!backend/.gitkeep
+!uploads/.gitkeep
