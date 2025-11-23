@@ -45,44 +45,121 @@ const Documents = ({
   handleDeleteDocument,
   setSearchQuery,
 }) => {
+  const [selectedStatus, setSelectedStatus] = React.useState("all");
+  const [selectedLanguage, setSelectedLanguage] = React.useState("all");
+  const [showFilters, setShowFilters] = React.useState(true);
+
+  // Filter documents based on all criteria
+  const filteredDocuments = documents.filter((doc) => {
+    if (selectedStatus !== "all" && doc.status !== selectedStatus) return false;
+    if (selectedLanguage !== "all" && doc.language !== selectedLanguage) return false;
+    return true;
+  });
+
+  const statusOptions = [
+    { value: "all", label: "All Status" },
+    { value: "urgent", label: "Urgent" },
+    { value: "review", label: "Review" },
+    { value: "approved", label: "Approved" },
+    { value: "published", label: "Published" },
+    { value: "pending", label: "Pending" },
+  ];
+
+  const languageOptions = [
+    { value: "all", label: "All Languages" },
+    { value: "English", label: "English" },
+    { value: "Malayalam", label: "Malayalam" },
+    { value: "Bilingual", label: "Bilingual" },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Filters */}
+      {/* Filters Header */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-          <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
-            <select
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={selectedDocType}
-              onChange={(e) => setSelectedDocType(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {docTypes.map((type) => (
-                <option
-                  key={type}
-                  value={type.toLowerCase().replace(/\s+/g, "-")}
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Filters</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {/* Department Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
+                <select
+                  value={selectedDepartment}
+                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 >
-                  {type}
-                </option>
-              ))}
-            </select>
-            <span className="text-sm text-gray-600">
-              Showing {documents.length} of {totalDocuments} documents
-            </span>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Document Type Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                <select
+                  value={selectedDocType}
+                  onChange={(e) => setSelectedDocType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  {docTypes.map((type) => (
+                    <option
+                      key={type}
+                      value={type.toLowerCase().replace(/\s+/g, "-")}
+                    >
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  {statusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Language Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Language</label>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  {languageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Info */}
+              <div className="flex items-end">
+                <span className="text-sm text-gray-600 font-medium">
+                  {filteredDocuments.length} / {totalDocuments}
+                </span>
+              </div>
+            </div>
           </div>
+
+          {/* Upload Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-blue-400"
+            className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-blue-400 whitespace-nowrap"
             disabled={loading}
           >
             {loading ? (
@@ -90,7 +167,7 @@ const Documents = ({
             ) : (
               <Upload className="h-4 w-4" />
             )}
-            <span>{loading ? "Processing..." : "Upload Document"}</span>
+            <span>{loading ? "Processing..." : "Upload"}</span>
           </button>
         </div>
       </div>
@@ -108,8 +185,8 @@ const Documents = ({
             <h3 className="text-lg font-medium mb-2">An Error Occurred</h3>
             <p>{error}</p>
           </div>
-        ) : documents.length > 0 ? (
-          documents.map((doc) => (
+        ) : filteredDocuments.length > 0 ? (
+          filteredDocuments.map((doc) => (
             <div
               key={doc._id}
               className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow"

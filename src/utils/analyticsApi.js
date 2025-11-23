@@ -17,22 +17,22 @@ const apiCall = async (endpoint) => {
 
 // Get dashboard statistics
 export const getDashboardStats = async () => {
-  return await apiCall('/documents/stats/dashboard');
+  return await apiCall('/dashboard/stats');
 };
 
 // Get upload trends data
 export const getUploadTrends = async () => {
-  return await apiCall('/documents/stats/upload-trends');
+  return await apiCall('/dashboard/upload-trends');
 };
 
 // Get department distribution data
 export const getDepartmentDistribution = async () => {
-  return await apiCall('/documents/stats/department-distribution');
+  return await apiCall('/dashboard/departments');
 };
 
 // Get processing efficiency data
 export const getProcessingEfficiency = async () => {
-  return await apiCall('/documents/stats/processing-efficiency');
+  return await apiCall('/dashboard/processing-efficiency');
 };
 
 // Get all analytics data at once
