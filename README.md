@@ -37,53 +37,71 @@ A comprehensive **Document Intelligence System** built for **Kochi Metro Rail Li
 
 ### Frontend
 - **React 19.1.1** - Modern UI library with latest features
-- **Vite** - Lightning-fast build tool and development server
-- **Tailwind CSS** - Utility-first CSS framework for rapid styling
-- **Lucide React** - Beautiful, customizable icons
+- **Vite 7.1.2** - Lightning-fast build tool and development server
+- **Tailwind CSS 3.4.17** - Utility-first CSS framework for rapid styling
+- **Chart.js 4.5.0** - Data visualization library
+- **React ChartJS-2 5.3.0** - React wrapper for Chart.js
+- **Lucide React 0.544.0** - Beautiful, customizable icons
 
 ### Backend
-- **Node.js & Express.js** - Robust server-side framework
-- **MongoDB & Mongoose** - NoSQL database for document storage
-- **Google Gemini AI** - Advanced AI for document analysis
-- **Multer** - File upload handling middleware
+- **Python 3.x** - Programming language
+- **Flask** - Lightweight Python web framework
+- **Flask-CORS** - Cross-Origin Resource Sharing support
+- **MongoDB** - NoSQL database for document storage
+- **PyMongo** - MongoDB driver for Python
+- **Google Gemini API** - Advanced AI for document analysis
 
-### Document Processing
-- **Tesseract.js** - OCR engine for text extraction
-- **PDF-Parse** - PDF document text extraction
-- **Mammoth** - Microsoft Word document processing
-- **ExcelJS** - Excel file processing
-- **Sharp** - Image processing and optimization
+### Document Processing Libraries
+- **PyMuPDF (fitz)** - PDF text extraction
+- **python-docx** - Microsoft Word (.doc, .docx) processing
+- **openpyxl** - Excel (.xls, .xlsx) file processing
+- **Pillow + Tesseract** - Image processing and OCR
+- **python-dotenv** - Environment variable management
 
-### Development Tools
-- **ESLint** - Code quality and consistency
-- **Jest** - Testing framework
-- **Nodemon** - Development server auto-restart
-- **Winston** - Comprehensive logging
+### Supported File Formats
+- **Documents**: PDF, DOCX, DOC, TXT
+- **Spreadsheets**: XLSX, XLS
+- **Images**: JPG, PNG (with OCR)
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Node.js** (v16.0.0 or higher)
-- **MongoDB** (Community Edition)
+- **Node.js** (v16.0.0 or higher) - For frontend
+- **Python** (v3.8 or higher) - For backend
+- **MongoDB** (Community Edition or Atlas)
 - **Google Gemini API Key** ([Get it here](https://ai.google.dev/))
+- **Tesseract OCR** (for image text extraction)
 
 ### Installation
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/your-username/kochi-metro-project.git
-   cd kochi-metro-project
+   git clone https://github.com/Samar23dev/MetroRail-Docintel.git
+   cd MetroRail-Docintel/Docintel
    ```
 
-2. **Install Frontend Dependencies**
+2. **Frontend Setup**
    ```bash
+   # Install frontend dependencies
    npm install
    ```
 
-3. **Install Backend Dependencies**
+3. **Backend Setup**
    ```bash
+   # Navigate to backend directory
    cd backend
-   npm install
+
+   # Create Python virtual environment
+   python -m venv venv
+
+   # Activate virtual environment
+   # On Windows:
+   venv\Scripts\activate
+   # On macOS/Linux:
+   source venv/bin/activate
+
+   # Install Python dependencies
+   pip install -r requirements.txt
    ```
 
 4. **Environment Configuration**
@@ -91,7 +109,10 @@ A comprehensive **Document Intelligence System** built for **Kochi Metro Rail Li
    Create a `.env` file in the `backend` directory:
    ```env
    # MongoDB Connection
-   MONGO_URI=mongodb://localhost:27017/kmrl-docintel
+   MONGO_URI=mongodb://localhost:27017/
+
+   # Database Name
+   DB_NAME=kmrl_docintel
 
    # Google Gemini AI API Key
    GEMINI_API_KEY=your_gemini_api_key_here
@@ -100,75 +121,108 @@ A comprehensive **Document Intelligence System** built for **Kochi Metro Rail Li
    PORT=5000
    ```
 
-5. **Start MongoDB**
-   ```bash
-   # Windows (as Administrator)
-   net start MongoDB
+5. **MongoDB Setup**
+   - **Local Installation**: 
+     ```bash
+     # Windows (run as Administrator)
+     net start MongoDB
+     ```
+   - **MongoDB Atlas** (Cloud):
+     - Create free account at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
+     - Get connection string and update `MONGO_URI` in `.env`
 
-   # macOS/Linux
-   brew services start mongodb/brew/mongodb-community
-   # or
-   sudo systemctl start mongod
-   ```
+6. **Start the Application**
 
-6. **Start the Backend Server**
+   **Terminal 1 - Backend**:
    ```bash
    cd backend
-   npm run dev
+   # Ensure venv is activated
+   python app.py
    ```
+   Backend runs on: `http://localhost:5000`
 
-7. **Start the Frontend Development Server**
+   **Terminal 2 - Frontend**:
    ```bash
+   # From root directory
    npm run dev
    ```
+   Frontend runs on: `http://localhost:5173`
 
-8. **Access the Application**
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:5000
+7. **Access the Application**
+   - Open browser and navigate to: `http://localhost:5173`
 
 ## 📁 Project Structure
 
 ```
-kochi-metro-project/
-├── 📁 frontend/
-│   ├── 📁 src/
-│   │   ├── 📁 components/      # React components
-│   │   │   ├── Header.jsx      # Navigation header
-│   │   │   ├── Sidebar.jsx     # Department navigation
-│   │   │   ├── Dashboard.jsx   # Main dashboard
-│   │   │   ├── Documents.jsx   # Document management
-│   │   │   ├── SearchPage.jsx  # Advanced search
-│   │   │   └── Analytics.jsx   # Analytics dashboard
-│   │   ├── 📁 constants/       # Configuration constants
-│   │   │   └── config.js       # App configuration
-│   │   ├── 📁 utils/           # Utility functions
-│   │   │   └── api.js          # API communication
-│   │   └── App.jsx             # Main application component
-│   ├── package.json
-│   └── vite.config.js
-├── 📁 backend/
-│   ├── 📁 config/              # Database configuration
-│   ├── 📁 controllers/         # Request handlers
-│   ├── 📁 models/              # MongoDB schemas
-│   ├── 📁 routes/              # API endpoints
-│   ├── 📁 uploads/             # File storage
-│   ├── server.js               # Express server
-│   └── package.json
-└── README.md
+Metrorail/Docintel/
+├── 📁 src/                          # Frontend React source
+│   ├── 📁 components/               # React components
+│   │   ├── Header.jsx               # Navigation header
+│   │   ├── Sidebar.jsx              # Department navigation
+│   │   ├── Dashboard.jsx            # Main dashboard
+│   │   ├── Documents.jsx            # Document management
+│   │   ├── SearchPage.jsx           # Advanced search interface
+│   │   ├── Analytics.jsx            # Analytics dashboard
+│   │   ├── EnhancedDocumentViewModal.jsx # Document viewer modal
+│   │   └── charts/
+│   │       └── ChartComponents.jsx  # Chart visualizations
+│   ├── 📁 utils/                    # Utility functions
+│   │   ├── api.js                   # API client
+│   │   └── analyticsApi.js          # Analytics API calls
+│   ├── 📁 constants/                # Configuration
+│   │   └── config.js                # App constants
+│   ├── App.jsx                      # Main application component
+│   ├── main.jsx                     # Entry point
+│   └── index.css                    # Global styles
+│
+├── 📁 backend/                      # Python Flask backend
+│   ├── app.py                       # Main Flask application
+│   ├── config.py                    # Configuration settings
+│   ├── requirements.txt             # Python dependencies
+│   ├── README.md                    # Backend setup guide
+│   ├── 📁 config/
+│   │   └── logger.js                # Logging configuration
+│   ├── 📁 controllers/
+│   │   └── documentController.js    # Request handlers
+│   ├── 📁 middleware/
+│   │   └── logging.js               # Logging middleware
+│   ├── 📁 models/
+│   │   └── Document.js              # Data models
+│   ├── 📁 routes/
+│   │   └── documentRoutes.js        # API route definitions
+│   └── 📁 utils/
+│       ├── document_processor.py    # Document processing utilities
+│       └── semantic_search.py       # NLP search engine
+│
+├── 📁 public/                       # Static assets
+│   └── vite.svg
+├── package.json                     # Frontend dependencies
+├── vite.config.js                   # Vite configuration
+├── tailwind.config.js               # Tailwind CSS configuration
+├── postcss.config.js                # PostCSS configuration
+├── eslint.config.js                 # ESLint configuration
+├── index.html                       # HTML entry point
+└── README.md                        # Main project README
 ```
 
 ## 🔧 API Endpoints
 
-### Documents
-- `GET /api/documents` - Fetch documents with filtering
+### Documents Management
+- `GET /api/documents` - Fetch documents with filtering (dept, type, search)
 - `POST /api/documents/upload` - Upload and process documents
-- `GET /api/documents/:id` - Get document analysis
-- `DELETE /api/documents/:id` - Delete document
+- `GET /api/documents/<doc_id>` - Get single document details
+- `PUT /api/documents/<doc_id>` - Update document (status, tags, starred)
+- `DELETE /api/documents/<doc_id>` - Delete document
+- `GET /api/documents/<doc_id>/download` - Download document as text file
 
-### Supported File Types
-- **Documents**: PDF, DOC, DOCX, TXT
-- **Spreadsheets**: XLS, XLSX
-- **Images**: JPG, JPEG, PNG
+### Search API
+- `POST /api/search/semantic` - Semantic search with NLP understanding
+
+### Analytics API
+- `GET /api/stats` - Get dashboard statistics
+
+### Health Check
+- `GET /health` - Health check endpoint
 
 ## 🏢 Departments & Document Types
 
