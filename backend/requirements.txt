@@ -9,3 +9,4 @@ openpyxl
 Pillow
 pytesseract
 google-generativeai
+google-genai
