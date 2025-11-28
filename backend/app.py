@@ -497,7 +497,8 @@ def analyze_document_with_gemini(text_content, source_bytes=None, filename=None,
                     "type": "OBJECT", 
                     "properties": {
                         "caption": {"type": "STRING"},
-                        "data": {"type": "ARRAY", "items": {"type": "ARRAY", "items": {"type": "STRING"}}}
+                        "data": {"type": "ARRAY", "items": {"type": "ARRAY", "items": {"type": "STRING"}}},
+                        "page_number": {"type": "INTEGER"}
                     },
                     "required": ["caption", "data"]
                 }
@@ -525,7 +526,8 @@ def analyze_document_with_gemini(text_content, source_bytes=None, filename=None,
                         "data_points": {
                             "type": "ARRAY",
                             "items": {"type": "OBJECT", "properties": {"label": {"type": "STRING"}, "value": {"type": "STRING"}}}
-                        }
+                        },
+                        "page_number": {"type": "INTEGER"}
                     },
                     "required": ["title", "chart_type", "data_points"]
                 }
@@ -538,13 +540,15 @@ def analyze_document_with_gemini(text_content, source_bytes=None, filename=None,
     if model_type.lower() == 'pro':
         system_prompt = (
             "You are an expert document analyst for KMRL (Kochi Metro Rail Limited). "
-            # ... rest of PROMPT ...
             "Analyze this document with advanced capabilities including: Handwritten text recognition (extract and interpret), Chart/diagram analysis (type, data points, trends), Table structure understanding (preserve formatting), Complex multi-format documents (text, images, tables, charts combined), and Mathematical expressions and technical drawings. "
             "Return comprehensive JSON with: title, summary (3-4 sentences), tags, department, type, status. "
             "Status: 'urgent' (critical/incident/deadline), 'approved' (routine/finalized), 'review' (unclear/pending). "
             "Extract ALL content: tables (with structure), figures, charts, handwritten notes, diagrams. "
             "For charts: identify type, extract data points, detect trends. "
             "For handwriting: transcribe text, note legibility issues. "
+            "IMPORTANT: For each table and chart, include the 'page_number' field indicating which page (1-indexed) the table/chart appears on in the PDF. "
+            "If the document mentions page numbers in the text (e.g., 'Page 5', 'on page 3'), use that information. "
+            "If page numbers are not explicitly mentioned, estimate based on document structure and content position. "
             "Return empty arrays only if genuinely absent."
         )
     else:
@@ -552,8 +556,10 @@ def analyze_document_with_gemini(text_content, source_bytes=None, filename=None,
         system_prompt = (
             "Analyze document and return JSON with: title, summary (2-3 sentences), tags, department, type, status. "
             "Status: 'urgent' (critical/incident), 'approved' (routine/finalized), 'review' (unclear). "
-            "Extract: tables (caption + data), figures (description/values/type), "
-            "charts (title/type with data_points). Return empty arrays if none found."
+            "Extract: tables (caption + data + page_number), figures (description/values/type), "
+            "charts (title/type with data_points + page_number). "
+            "For each table and chart, include 'page_number' (1-indexed) indicating which page it appears on. "
+            "Return empty arrays if none found."
         )
 
     # 5. Build content parts (original file + OCR text)

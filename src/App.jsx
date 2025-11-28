@@ -1715,6 +1715,9 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
   const [isDownloading, setIsDownloading] = React.useState(false);
   const [expandedTableIndex, setExpandedTableIndex] = React.useState(null);
   const [activeTab, setActiveTab] = React.useState("summary");
+  const [currentPdfPage, setCurrentPdfPage] = React.useState(1);
+  const pdfIframeRef = React.useRef(null);
+  
   const viewerUrl = React.useMemo(() => {
     if (doc?.file_url) {
       return `${API_BASE_URL}${doc.file_url}`;
@@ -1725,6 +1728,46 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
     return null;
   }, [doc]);
   const isImagePreview = doc?.file_mime?.startsWith("image/");
+  const isPdfFile = doc?.file_mime === "application/pdf" || doc?.file_name?.endsWith(".pdf");
+  
+  // Function to navigate to a specific PDF page
+  const navigateToPdfPage = React.useCallback((pageNumber, event) => {
+    // Prevent any event propagation
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
+    if (!isPdfFile || !viewerUrl || !pageNumber) {
+      if (!isPdfFile) {
+        alert("Page navigation is only available for PDF documents.");
+      }
+      return;
+    }
+    
+    setCurrentPdfPage(pageNumber);
+    
+    // Update iframe src with page number
+    const pageUrl = `${viewerUrl}#page=${pageNumber}`;
+    
+    // If iframe exists, update its src
+    if (pdfIframeRef.current) {
+      pdfIframeRef.current.src = pageUrl;
+    }
+    
+    // Don't switch tabs - PDF viewer is always visible on the left
+    // Just highlight the PDF viewer briefly to show it updated
+    setTimeout(() => {
+      const pdfViewer = document.querySelector('[data-pdf-viewer]');
+      if (pdfViewer) {
+        pdfViewer.style.transition = 'box-shadow 0.3s ease';
+        pdfViewer.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.5)';
+        setTimeout(() => {
+          pdfViewer.style.boxShadow = '';
+        }, 500);
+      }
+    }, 100);
+  }, [isPdfFile, viewerUrl]);
 
   const tabs = [
     { id: "summary", label: "Summary", icon: FileText },
@@ -1891,7 +1934,7 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-2 sm:p-4"
       onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}>
         {/* ===== HEADER ===== */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-300 p-4 sm:p-6 flex-shrink-0">
@@ -1943,139 +1986,178 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
           </div>
         </div>
 
-        {/* ===== TAB NAVIGATION ===== */}
-        <div className="border-b border-gray-200 bg-white px-4 sm:px-6 py-3 flex-shrink-0 overflow-x-auto">
-          <div className="flex gap-2 sm:gap-4">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${activeTab === tab.id
-                    ? "bg-blue-100 text-blue-700 border-b-2 border-blue-600"
-                    : "text-gray-600 hover:bg-gray-100"
-                  }`}>
-                <tab.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ===== CONTENT AREA ===== */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 sm:p-6">
-            {/* Summary Tab */}
-            {activeTab === "summary" && (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-6">
-                  {/* Main Summary */}
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-6 rounded-xl">
-                    <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-lg">
-                      <Zap className="h-5 w-5 text-blue-600" />
-                      AI-Generated Summary
-                    </h3>
-                    <p className="text-gray-700 leading-relaxed">{doc.summary}</p>
-                  </div>
-
-                  {/* Tags */}
-                  {doc.tags && doc.tags.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <Tag className="h-5 w-5 text-pink-600" />
-                        Keywords & Tags
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {doc.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="px-4 py-2 bg-pink-100 text-pink-700 text-sm font-medium rounded-full border border-pink-300 hover:bg-pink-200 transition-colors">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Key Figures */}
-                  {doc.figures_data && doc.figures_data.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold text-gray-800 mb-4">
-                        Key Figures & Metrics
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {doc.figures_data.map((fig, idx) => (
-                          <div
-                            key={idx}
-                            className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-lg border-2 border-orange-200">
-                            <p className="text-sm text-gray-600 mb-2">
-                              {fig.description}
-                            </p>
-                            <p className="text-3xl font-bold text-orange-600">
-                              {fig.values?.[0] || "N/A"}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1 capitalize">
-                              Type: {fig.type}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+        {/* ===== MAIN CONTENT LAYOUT: PDF VIEWER (LEFT) + CONTENT (RIGHT) ===== */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* ===== LEFT SIDEBAR: PDF VIEWER ===== */}
+          {isPdfFile && viewerUrl && (
+            <div className="w-1/2 border-r border-gray-300 bg-gray-50 flex flex-col flex-shrink-0" data-pdf-viewer>
+              <div className="bg-white border-b border-gray-300 p-4 flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                    Original Document
+                  </h3>
+                  {currentPdfPage > 0 && (
+                    <span className="text-sm text-gray-600 font-medium">
+                      Page {currentPdfPage}
+                    </span>
                   )}
                 </div>
+                <div className="flex items-center gap-2">
+                  {viewerUrl && (
+                    <button
+                      onClick={() => {
+                        const url = isPdfFile && currentPdfPage > 0 
+                          ? `${viewerUrl}#page=${currentPdfPage}`
+                          : viewerUrl;
+                        window.open(url, "_blank", "noopener");
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1 hover:bg-blue-50 rounded-lg transition-colors">
+                      Open in new tab
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 overflow-hidden bg-gray-100">
+                <iframe
+                  ref={pdfIframeRef}
+                  title="Document preview"
+                  src={`${viewerUrl}${isPdfFile && currentPdfPage > 0 ? `#page=${currentPdfPage}` : '#toolbar=0&navpanes=0'}`}
+                  className="w-full h-full bg-white"
+                  style={{ border: 'none' }}
+                />
+              </div>
+              {viewerUrl && (
+                <div className="bg-white border-t border-gray-300 p-3 flex flex-wrap gap-2 flex-shrink-0">
+                  <a
+                    href={viewerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                    View Full Document
+                  </a>
+                  <a
+                    href={viewerUrl}
+                    download={doc.file_name || "document.pdf"}
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                    Download Original
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6 flex flex-col min-h-[24rem]">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                      Original Document Preview
+          {/* ===== RIGHT CONTENT AREA ===== */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* ===== TAB NAVIGATION ===== */}
+            <div className="border-b border-gray-200 bg-white px-4 sm:px-6 py-3 flex-shrink-0 overflow-x-auto">
+              <div className="flex gap-2 sm:gap-4">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${activeTab === tab.id
+                        ? "bg-blue-100 text-blue-700 border-b-2 border-blue-600"
+                        : "text-gray-600 hover:bg-gray-100"
+                      }`}>
+                    <tab.icon className="h-4 w-4" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ===== CONTENT AREA ===== */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 sm:p-6">
+            {/* Summary Tab */}
+            {activeTab === "summary" && (
+              <div className="space-y-6">
+                {/* Main Summary */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-6 rounded-xl">
+                  <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-lg">
+                    <Zap className="h-5 w-5 text-blue-600" />
+                    AI-Generated Summary
+                  </h3>
+                  <p className="text-gray-700 leading-relaxed">{doc.summary}</p>
+                </div>
+
+                {/* Tags */}
+                {doc.tags && doc.tags.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <Tag className="h-5 w-5 text-pink-600" />
+                      Keywords & Tags
                     </h3>
-                    {viewerUrl && (
-                      <button
-                        onClick={() => window.open(viewerUrl, "_blank", "noopener")}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                        Open in new tab
-                      </button>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {doc.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-4 py-2 bg-pink-100 text-pink-700 text-sm font-medium rounded-full border border-pink-300 hover:bg-pink-200 transition-colors">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
-                    {viewerUrl ? (
-                      isImagePreview ? (
+                )}
+
+                {/* Key Figures */}
+                {doc.figures_data && doc.figures_data.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-4">
+                      Key Figures & Metrics
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {doc.figures_data.map((fig, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-lg border-2 border-orange-200">
+                          <p className="text-sm text-gray-600 mb-2">
+                            {fig.description}
+                          </p>
+                          <p className="text-3xl font-bold text-orange-600">
+                            {fig.values?.[0] || "N/A"}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1 capitalize">
+                            Type: {fig.type}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Image Preview for non-PDF files */}
+                {!isPdfFile && viewerUrl && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-blue-600" />
+                        Original Document Preview
+                      </h3>
+                      {viewerUrl && (
+                        <button
+                          onClick={() => window.open(viewerUrl, "_blank", "noopener")}
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                          Open in new tab
+                        </button>
+                      )}
+                    </div>
+                    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden min-h-[400px]">
+                      {isImagePreview ? (
                         <img
                           src={viewerUrl}
                           alt="Original document preview"
-                          className="w-full h-full object-contain"
+                          className="w-full h-full object-contain max-h-[600px]"
                         />
                       ) : (
-                        <iframe
-                          title="Document preview"
-                          src={`${viewerUrl}#toolbar=0&navpanes=0`}
-                          className="w-full h-full bg-white"
-                        />
-                      )
-                    ) : (
-                      <p className="text-sm text-gray-500 text-center px-4">
-                        Original file preview unavailable for this document.
-                      </p>
-                    )}
-                  </div>
-                  {viewerUrl && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <a
-                        href={viewerUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                        View Full Document
-                      </a>
-                      <a
-                        href={viewerUrl}
-                        download={doc.file_name || "document.pdf"}
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">
-                        Download Original
-                      </a>
+                        <p className="text-sm text-gray-500 text-center px-4">
+                          Document preview available in left panel for PDFs.
+                        </p>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2092,10 +2174,26 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
                         key={idx}
                         className="bg-white p-6 rounded-xl border-2 border-gray-200 hover:shadow-lg transition-shadow">
                         <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {chart.title}
-                            </h3>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                {chart.title}
+                              </h3>
+                              {isPdfFile && chart.page_number !== undefined && chart.page_number !== null && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    navigateToPdfPage(chart.page_number, e);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-full border border-blue-200 transition-colors cursor-pointer"
+                                  title={`View on page ${chart.page_number}`}>
+                                  <FileText className="h-3 w-3" />
+                                  Page {chart.page_number}
+                                </button>
+                              )}
+                            </div>
                             {chart.description && (
                               <p className="text-sm text-gray-600 mt-1">
                                 {chart.description}
@@ -2195,9 +2293,25 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
                         <div
                           className={`${headerColor.bg} ${headerColor.text} border-b-2 border-gray-300 px-6 py-4`}>
                           <div className="flex items-center justify-between">
-                            <h4 className="text-lg font-bold">
-                              📋 {tableObj.caption || `Table ${tableIdx + 1}`}
-                            </h4>
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <h4 className="text-lg font-bold">
+                                📋 {tableObj.caption || `Table ${tableIdx + 1}`}
+                              </h4>
+                              {isPdfFile && tableObj.page_number !== undefined && tableObj.page_number !== null && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    navigateToPdfPage(tableObj.page_number, e);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-full border border-white/30 transition-colors cursor-pointer"
+                                  title={`View on page ${tableObj.page_number}`}>
+                                  <FileText className="h-3 w-3" />
+                                  Page {tableObj.page_number}
+                                </button>
+                              )}
+                            </div>
                             {dataRows.length > 5 && (
                               <button
                                 onClick={() =>
@@ -2221,6 +2335,9 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
                             {dataRows.length !== 1 ? "s" : ""} •{" "}
                             {headerRow.length} column
                             {headerRow.length !== 1 ? "s" : ""}
+                            {tableObj.page_number && isPdfFile && (
+                              <span className="ml-2">• Page {tableObj.page_number}</span>
+                            )}
                           </p>
                         </div>
 
@@ -2357,6 +2474,8 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
                 )}
               </div>
             )}
+              </div>
+            </div>
           </div>
         </div>
 
