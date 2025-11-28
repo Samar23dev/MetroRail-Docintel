@@ -1,0 +1,31 @@
+# Frontend build artifacts
+node_modules/
+dist/
+.vite/
+
+# Backend/Python environments
+venv/
+backend/venv/
+**/__pycache__/
+*.py[cod]
+
+# Local environment & config
+.env
+*.env.local
+backend/.env
+
+# Uploaded/generated files
+backend/uploads/
+*.log
+
+# IDE/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Coverage & test outputs
+coverage/
+.pytest_cache/
+
+venv/
