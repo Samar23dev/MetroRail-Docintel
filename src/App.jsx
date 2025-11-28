@@ -111,6 +111,8 @@ const docTypes = [
   "Incident Report",
 ];
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 // --- Main App Component ---
 const App = () => {
   // --- State Management ---
@@ -1713,6 +1715,16 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
   const [isDownloading, setIsDownloading] = React.useState(false);
   const [expandedTableIndex, setExpandedTableIndex] = React.useState(null);
   const [activeTab, setActiveTab] = React.useState("summary");
+  const viewerUrl = React.useMemo(() => {
+    if (doc?.file_url) {
+      return `${API_BASE_URL}${doc.file_url}`;
+    }
+    if (doc?._id) {
+      return `${API_BASE_URL}/api/documents/${doc._id}/file`;
+    }
+    return null;
+  }, [doc]);
+  const isImagePreview = doc?.file_mime?.startsWith("image/");
 
   const tabs = [
     { id: "summary", label: "Summary", icon: FileText },
@@ -1954,60 +1966,116 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
           <div className="p-4 sm:p-6">
             {/* Summary Tab */}
             {activeTab === "summary" && (
-              <div className="space-y-6">
-                {/* Main Summary */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-6 rounded-xl">
-                  <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-lg">
-                    <Zap className="h-5 w-5 text-blue-600" />
-                    AI-Generated Summary
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed">{doc.summary}</p>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="space-y-6">
+                  {/* Main Summary */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-6 rounded-xl">
+                    <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-lg">
+                      <Zap className="h-5 w-5 text-blue-600" />
+                      AI-Generated Summary
+                    </h3>
+                    <p className="text-gray-700 leading-relaxed">{doc.summary}</p>
+                  </div>
+
+                  {/* Tags */}
+                  {doc.tags && doc.tags.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <Tag className="h-5 w-5 text-pink-600" />
+                        Keywords & Tags
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {doc.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-4 py-2 bg-pink-100 text-pink-700 text-sm font-medium rounded-full border border-pink-300 hover:bg-pink-200 transition-colors">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Key Figures */}
+                  {doc.figures_data && doc.figures_data.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-800 mb-4">
+                        Key Figures & Metrics
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {doc.figures_data.map((fig, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-lg border-2 border-orange-200">
+                            <p className="text-sm text-gray-600 mb-2">
+                              {fig.description}
+                            </p>
+                            <p className="text-3xl font-bold text-orange-600">
+                              {fig.values?.[0] || "N/A"}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1 capitalize">
+                              Type: {fig.type}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Tags */}
-                {doc.tags && doc.tags.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <Tag className="h-5 w-5 text-pink-600" />
-                      Keywords & Tags
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6 flex flex-col min-h-[24rem]">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      Original Document Preview
                     </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {doc.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-4 py-2 bg-pink-100 text-pink-700 text-sm font-medium rounded-full border border-pink-300 hover:bg-pink-200 transition-colors">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
+                    {viewerUrl && (
+                      <button
+                        onClick={() => window.open(viewerUrl, "_blank", "noopener")}
+                        className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        Open in new tab
+                      </button>
+                    )}
                   </div>
-                )}
-
-                {/* Key Figures */}
-                {doc.figures_data && doc.figures_data.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-800 mb-4">
-                      Key Figures & Metrics
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {doc.figures_data.map((fig, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-lg border-2 border-orange-200">
-                          <p className="text-sm text-gray-600 mb-2">
-                            {fig.description}
-                          </p>
-                          <p className="text-3xl font-bold text-orange-600">
-                            {fig.values?.[0] || "N/A"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1 capitalize">
-                            Type: {fig.type}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex-1 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
+                    {viewerUrl ? (
+                      isImagePreview ? (
+                        <img
+                          src={viewerUrl}
+                          alt="Original document preview"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <iframe
+                          title="Document preview"
+                          src={`${viewerUrl}#toolbar=0&navpanes=0`}
+                          className="w-full h-full bg-white"
+                        />
+                      )
+                    ) : (
+                      <p className="text-sm text-gray-500 text-center px-4">
+                        Original file preview unavailable for this document.
+                      </p>
+                    )}
                   </div>
-                )}
+                  {viewerUrl && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <a
+                        href={viewerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                        View Full Document
+                      </a>
+                      <a
+                        href={viewerUrl}
+                        download={doc.file_name || "document.pdf"}
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">
+                        Download Original
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

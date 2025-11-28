@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 import json
 from io import BytesIO
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+from werkzeug.utils import secure_filename
+from pathlib import Path
 
 try:
     import pytesseract
@@ -46,6 +48,8 @@ OCR_LANGUAGES = os.getenv('OCR_LANGUAGES', 'eng+mal')
 OCR_PSM = os.getenv('OCR_PSM', '6')
 OCR_OEM = os.getenv('OCR_OEM', '1')
 OCR_CONFIG = os.getenv('OCR_CONFIG', '').strip()
+UPLOAD_FOLDER = Path(os.getenv('UPLOAD_FOLDER', Path(__file__).parent / 'uploads'))
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 if GEMINI_MODEL.lower() == 'pro':
     GEMINI_API_MODEL = 'gemini-1.5-pro'
@@ -63,6 +67,16 @@ documents_collection.create_index('title')
 documents_collection.create_index('department')
 documents_collection.create_index('type')
 documents_collection.create_index('tags')
+
+
+def serialize_document(doc):
+    """Convert Mongo document to JSON-serializable dict with file URLs."""
+    if not doc:
+        return None
+    doc['_id'] = str(doc['_id'])
+    if doc.get('file_path'):
+        doc['file_url'] = f"/api/documents/{doc['_id']}/file"
+    return doc
 
 
 # -------------------------
@@ -846,10 +860,15 @@ def semantic_search(query, collection, top_k=10):
 
     results.sort(key=lambda x: x["similarity"], reverse=True)
 
+    serialized_results = []
     for r in results:
-        r['_id'] = str(r['_id'])
+        serialized = serialize_document(r)
+        if serialized:
+            serialized['similarity'] = r.get('similarity')
+            serialized['_score'] = r.get('_score')
+            serialized_results.append(serialized)
 
-    return results[:top_k]
+    return serialized_results[:top_k]
 
 
 # -------------------------
@@ -889,9 +908,7 @@ def get_documents():
                                    .sort('date', -1)
                                    .skip(skip)
                                    .limit(limit))
-        
-        for doc in documents:
-            doc['_id'] = str(doc['_id'])
+        documents = [serialize_document(doc) for doc in documents]
         
         return jsonify({
             'documents': documents,
@@ -935,6 +952,14 @@ def upload_document():
         file.stream.seek(0)
         original_bytes = file.read()
 
+        # Save original file for future viewing
+        original_filename = secure_filename(file.filename) or f"document_{datetime.now().strftime('%Y%m%d_%H%M%S')}.bin"
+        unique_suffix = datetime.now().strftime('%Y%m%d%H%M%S%f')
+        stored_filename = f"{unique_suffix}_{original_filename}"
+        stored_path = UPLOAD_FOLDER / stored_filename
+        with open(stored_path, 'wb') as stored_file:
+            stored_file.write(original_bytes)
+
         print("Analyzing document with Gemini AI...")
         processed_data = analyze_document_with_gemini(
             text_content,
@@ -953,10 +978,14 @@ def upload_document():
         # processed_data['status'] = 'review' # <-- REMOVED: Status is now AI-assigned
         processed_data['source'] = 'uploaded'
         processed_data['starred'] = False
+        processed_data['file_name'] = file.filename
+        processed_data['file_mime'] = file.mimetype
+        processed_data['file_path'] = str(stored_path)
         
         # 4. Insert into database
         result = documents_collection.insert_one(processed_data)
         processed_data['_id'] = str(result.inserted_id)
+        processed_data = serialize_document(processed_data)
         
         print(f"Successfully added document {result.inserted_id} to database.")
         return jsonify(processed_data), 201
@@ -1002,8 +1031,7 @@ def get_document(doc_id):
         if not doc:
             return jsonify({'error': 'Document not found'}), 404
         
-        doc['_id'] = str(doc['_id'])
-        return jsonify(doc)
+        return jsonify(serialize_document(doc))
     except Exception as e:
         print(f"Error in get_document: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -1036,6 +1064,32 @@ def update_document(doc_id):
         return jsonify({'message': 'Document updated successfully'}), 200
     except Exception as e:
         print(f"Error in update_document: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/documents/<doc_id>/file', methods=['GET'])
+def download_original_file(doc_id):
+    """Stream the originally uploaded file for inline viewing."""
+    try:
+        doc = documents_collection.find_one(
+            {'_id': ObjectId(doc_id)},
+            {'file_path': 1, 'file_name': 1, 'file_mime': 1}
+        )
+        if not doc or not doc.get('file_path'):
+            return jsonify({'error': 'File not found'}), 404
+        
+        file_path = Path(doc['file_path'])
+        if not file_path.exists():
+            return jsonify({'error': 'File missing on server'}), 404
+        
+        return send_file(
+            file_path,
+            mimetype=doc.get('file_mime') or 'application/octet-stream',
+            as_attachment=False,
+            download_name=doc.get('file_name') or file_path.name
+        )
+    except Exception as e:
+        print(f"Error in download_original_file: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -1205,9 +1259,7 @@ def get_recent_documents():
             .sort('date', -1)
             .limit(5)
         )
-        
-        for doc in recent_docs:
-            doc['_id'] = str(doc['_id'])
+        recent_docs = [serialize_document(doc) for doc in recent_docs]
         
         return jsonify({'recent_documents': recent_docs})
     except Exception as e:
@@ -1429,9 +1481,7 @@ def advanced_search():
             query_filter['tags'] = {'$in': tags}
         
         documents = list(documents_collection.find(query_filter).sort('date', -1))
-        
-        for doc in documents:
-            doc['_id'] = str(doc['_id'])
+        documents = [serialize_document(doc) for doc in documents]
         
         return jsonify({
             'results': documents,
@@ -1485,9 +1535,7 @@ def get_starred_documents():
             documents_collection.find({'starred': True})
             .sort('date', -1)
         )
-        
-        for doc in starred_docs:
-            doc['_id'] = str(doc['_id'])
+        starred_docs = [serialize_document(doc) for doc in starred_docs]
         
         return jsonify({
             'documents': starred_docs,
@@ -1514,9 +1562,7 @@ def get_documents_by_department(department):
             .skip(skip)
             .limit(limit)
         )
-        
-        for doc in documents:
-            doc['_id'] = str(doc['_id'])
+        documents = [serialize_document(doc) for doc in documents]
         
         return jsonify({
             'documents': documents,
