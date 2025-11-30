@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, make_response, send_file
 from flask_cors import CORS
-from pymongo import MongoClient
+from pymongo import MongoClient, ReturnDocument # <-- ADD ReturnDocument HERE
 from bson.objectid import ObjectId
 from datetime import datetime
 import os
@@ -930,6 +930,80 @@ def get_documents():
         return jsonify({'error': str(e)}), 500
 
 
+
+
+# ... existing imports ...
+from datetime import datetime, timedelta # Added timedelta for date calculations
+
+# ... existing global variables ...
+# MONGO_URI, DB_NAME, GEMINI_API_KEY, etc.
+
+client = MongoClient(MONGO_URI)
+db = client[DB_NAME]
+documents_collection = db['documents']
+# --- NEW: Collection for tracking processing times ---
+processing_logs_collection = db['processing_logs']
+
+# Create indexes
+documents_collection.create_index('title')
+# ... other existing indexes ...
+
+# --- NEW: Functions to log and calculate processing time ---
+
+def log_processing_start(doc_id):
+    """Log the start time of document processing."""
+    processing_logs_collection.insert_one({
+        'doc_id': ObjectId(doc_id),
+        'start_time': datetime.now(),
+        'status': 'started'
+    })
+
+# app.py (EXISTING log_processing_end - Already fine, but confirming logic)
+def log_processing_end(doc_id, success=True):
+    """Log the end time of document processing and calculate duration."""
+    current_time = datetime.now()
+    log_entry = processing_logs_collection.find_one_and_update(
+        {'doc_id': ObjectId(doc_id), 'status': 'started'},
+        {'$set': {'end_time': current_time, 'status': 'completed' if success else 'failed'}},
+        return_document=ReturnDocument.AFTER # Need AFTER if using it immediately
+    )
+    # The original implementation didn't use the result of find_one_and_update correctly
+    
+    if log_entry and log_entry.get('start_time'):
+        # Calculate duration based on the actual start time and the recorded end time
+        duration = (current_time - log_entry['start_time']).total_seconds() 
+        
+        # Update with the calculated duration
+        processing_logs_collection.update_one(
+            {'_id': log_entry['_id']},
+            {'$set': {'duration_seconds': duration}}
+        )
+        return duration
+    return None
+
+def calculate_avg_processing_time():
+    """Calculate the average duration of completed processes in seconds."""
+    pipeline = [
+        {'$match': {'status': 'completed', 'duration_seconds': {'$exists': True}}},
+        {'$group': {'_id': None, 'avg_duration': {'$avg': '$duration_seconds'}}}
+    ]
+    result = list(processing_logs_collection.aggregate(pipeline))
+    if result:
+        return round(result[0]['avg_duration'], 2)
+    return 0
+
+def calculate_processing_efficiency():
+    """Calculate the percentage of documents that were auto-processed (successfully analyzed)."""
+    total_processed = documents_collection.count_documents({})
+    error_docs = documents_collection.count_documents({'title': {'$regex': 'Error During Analysis', '$options': 'i'}})
+    
+    if total_processed == 0:
+        return 0.0
+
+    # Efficiency is defined as (Total - Errors) / Total
+    efficiency = ((total_processed - error_docs) / total_processed) * 100
+    return round(efficiency, 2)
+
 # --- [UPDATED] UPLOAD ROUTE - Status is now AI-assigned ---
 @app.route('/api/documents/upload', methods=['POST'])
 def upload_document():
@@ -965,6 +1039,9 @@ def upload_document():
         stored_path = UPLOAD_FOLDER / stored_filename
         with open(stored_path, 'wb') as stored_file:
             stored_file.write(original_bytes)
+            
+        doc_id = ObjectId()
+        log_processing_start(doc_id)
 
         print("Analyzing document with Gemini AI...")
         processed_data = analyze_document_with_gemini(
@@ -979,6 +1056,7 @@ def upload_document():
         processed_data['charts'] = normalize_charts(processed_data)
 
         # 3. Add remaining data (status is already in processed_data)
+        processed_data['_id'] = doc_id
         processed_data['content'] = text_content # Store the full text
         processed_data['date'] = datetime.now()
         # processed_data['status'] = 'review' # <-- REMOVED: Status is now AI-assigned
@@ -989,14 +1067,29 @@ def upload_document():
         processed_data['file_path'] = str(stored_path)
         
         # 4. Insert into database
-        result = documents_collection.insert_one(processed_data)
-        processed_data['_id'] = str(result.inserted_id)
-        processed_data = serialize_document(processed_data)
+        documents_collection.insert_one(processed_data)
         
-        print(f"Successfully added document {result.inserted_id} to database.")
+        # --- NEW: Log Processing End on SUCCESS ---
+        # Call the logging function to calculate and save the duration in processing_logs
+        duration = log_processing_end(doc_id)
+        if duration is not None:
+            documents_collection.update_one(
+                {'_id': doc_id},
+                {'$set': {'processing_duration': duration}}
+            )
+            print(f"Document processing completed in {duration:.2f} seconds.")
+        
+        # 5. Final response
+        processed_data['_id'] = str(doc_id)
+        processed_data = serialize_document(documents_collection.find_one({'_id': doc_id}))
+        
+        print(f"Successfully added document {doc_id} to database.")
         return jsonify(processed_data), 201
         
     except Exception as e:
+        # Handle failure: log failure and clean up.
+        if 'doc_id' in locals():
+            log_processing_end(doc_id, success=False)
         print(f"Error in upload_document: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
@@ -1124,16 +1217,21 @@ def get_dashboard_stats():
     try:
         total_docs = documents_collection.count_documents({})
         urgent_docs = documents_collection.count_documents({'status': 'urgent'})
+        start_of_day = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         today_docs = documents_collection.count_documents({
-            'date': {'$gte': datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)}
+            'date': {'$gte': start_of_day}
         })
+        
         approved_docs = documents_collection.count_documents({'status': 'approved'})
         review_docs = documents_collection.count_documents({'status': 'review'})
         starred_docs = documents_collection.count_documents({'starred': True})
         
-        # Calculate average processing time (mock for now)
-        avg_processing_time = 2.3
+        avg_processing_time_sec = calculate_avg_processing_time()
+        # Convert seconds to a more readable hour/minute format for the UI (e.g., "2.3h")
+        avg_processing_time_hr = round(avg_processing_time_sec / 3600, 1)
         
+        processing_efficiency = calculate_processing_efficiency()   
+             
         return jsonify({
             'total_documents': total_docs,
             'urgent_items': urgent_docs,
@@ -1141,8 +1239,9 @@ def get_dashboard_stats():
             'approved_documents': approved_docs,
             'review_documents': review_docs,
             'starred_documents': starred_docs,
-            'avg_processing_time': avg_processing_time,
-            'processing_efficiency': 94.2
+            'avg_processing_time': avg_processing_time_hr, 
+            'avg_processing_time_sec': avg_processing_time_sec, # Optionally pass the raw value
+            'processing_efficiency': processing_efficiency
         })
     except Exception as e:
         print(f"Error in get_dashboard_stats: {str(e)}")
@@ -1206,6 +1305,47 @@ def get_tags_stats():
         print(f"Error in get_tags_stats: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/dashboard/today-summary', methods=['GET'])
+def get_today_summary():
+    """Get the quick stats for the sidebar's 'Today's Summary'"""
+    try:
+        # Calculate start of today (local time)
+        start_of_day = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Match documents created today
+        query_filter = {'date': {'$gte': start_of_day}}
+        
+        new_documents = documents_collection.count_documents(query_filter)
+        
+        # Use a more appropriate definition for processed/pending:
+        # Processed: Approved/Published today
+        processed_today = documents_collection.count_documents({
+            'date': {'$gte': start_of_day}, 
+            'status': {'$in': ['approved', 'published']}
+        })
+        
+        # Pending: Documents uploaded today with status 'review' or 'pending'
+        pending_today = documents_collection.count_documents({
+            'date': {'$gte': start_of_day}, 
+            'status': {'$in': ['review', 'pending']}
+        })
+        
+        # Urgent: Documents with 'urgent' status today
+        urgent_today = documents_collection.count_documents({
+            'date': {'$gte': start_of_day}, 
+            'status': 'urgent'
+        })
+        
+        return jsonify({
+            'new_documents': new_documents,
+            'processed': processed_today,
+            'pending': pending_today,
+            'urgent': urgent_today
+        })
+    except Exception as e:
+        print(f"Error in get_today_summary: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard/document-types', methods=['GET'])
 def get_document_types_stats():

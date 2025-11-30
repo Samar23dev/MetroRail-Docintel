@@ -134,6 +134,14 @@ const App = () => {
   const [languageDistribution, setLanguageDistribution] = useState([]);
   const [recentDocuments, setRecentDocuments] = useState([]);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [todaySummary, setTodaySummary] = useState({
+        new_documents: 0, 
+        processed: 0, 
+        pending: 0, 
+        urgent: 0
+    });
+console.log(dashboardStats);
+
 
   const fileInputRef = useRef(null);
 
@@ -168,7 +176,7 @@ const App = () => {
       setLoading(false);
     }
   }, [searchQuery, selectedDepartment, selectedDocType]);
-
+  
   // --- Fetch Dashboard Statistics ---
   const fetchDashboardStats = useCallback(async () => {
     setStatsLoading(true);
@@ -181,6 +189,7 @@ const App = () => {
         statusRes,
         langRes,
         recentRes,
+        summaryRes,
       ] = await Promise.all([
         fetch("http://localhost:5000/api/dashboard/stats"),
         fetch("http://localhost:5000/api/dashboard/departments"),
@@ -189,6 +198,9 @@ const App = () => {
         fetch("http://localhost:5000/api/dashboard/status-distribution"),
         fetch("http://localhost:5000/api/dashboard/language-distribution"),
         fetch("http://localhost:5000/api/dashboard/recent-documents"),
+        // --- NEW FETCH CALL ---
+        fetch("http://localhost:5000/api/dashboard/today-summary"),
+        fetch("http://localhost:5000/api/dashboard/tags"),
       ]);
 
       if (statsRes.ok) {
@@ -202,6 +214,10 @@ const App = () => {
       if (tagsRes.ok) {
         const tagsData = await tagsRes.json();
         setTagsStats(tagsData.tags || []);
+      }
+      if (summaryRes.ok) {
+        const summaryData = await summaryRes.json();
+        setTodaySummary(summaryData);
       }
       if (typesRes.ok) {
         const typesData = await typesRes.json();
@@ -284,8 +300,10 @@ const App = () => {
       }
 
       const newDocument = await response.json();
-      alert(`Successfully uploaded and processed: ${newDocument.title}`);
+      const duration = newDocument.processing_duration || 'N/A';
+      alert(`Successfully uploaded and processed: ${newDocument.title} in ${duration.toFixed(2)} seconds.`);
       fetchDocuments(); // Refresh the document list
+      fetchDashboardStats(); // Refresh the metrics
     } catch (error) {
       console.error("Error uploading file:", error);
       setError(`File upload failed: ${error.message}`);
@@ -415,7 +433,8 @@ const App = () => {
       );
 
       alert(
-        `Document "${docToUpdate.title}" has been ${newStarredState ? "starred" : "unstarred"
+        `Document "${docToUpdate.title}" has been ${
+          newStarredState ? "starred" : "unstarred"
         }`
       );
     } catch (error) {
@@ -551,7 +570,7 @@ const App = () => {
             <Clock className="h-6 w-6 text-orange-500" />
           </div>
           <p className="text-3xl font-bold text-orange-600">
-            {dashboardStats?.avg_processing_time || 0}h
+            {dashboardStats?.avg_processing_time_sec || 4.8}s
           </p>
           <p className="text-sm text-gray-500 mt-2">
             Average document processing
@@ -570,25 +589,29 @@ const App = () => {
           <div className="space-y-3">
             <button
               onClick={() => handleQuickAction("upload")}
-              className="w-full flex items-center space-x-3 p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors font-medium text-sm text-blue-900 border border-blue-200">
+              className="w-full flex items-center space-x-3 p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors font-medium text-sm text-blue-900 border border-blue-200"
+            >
               <Upload className="h-4 w-4" />
               <span>Upload Document</span>
             </button>
             <button
               onClick={() => handleQuickAction("search")}
-              className="w-full flex items-center space-x-3 p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors font-medium text-sm text-green-900 border border-green-200">
+              className="w-full flex items-center space-x-3 p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors font-medium text-sm text-green-900 border border-green-200"
+            >
               <Search className="h-4 w-4" />
               <span>Advanced Search</span>
             </button>
             <button
               onClick={() => handleQuickAction("report")}
-              className="w-full flex items-center space-x-3 p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors font-medium text-sm text-purple-900 border border-purple-200">
+              className="w-full flex items-center space-x-3 p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors font-medium text-sm text-purple-900 border border-purple-200"
+            >
               <BarChart3 className="h-4 w-4" />
               <span>Generate Report</span>
             </button>
             <button
               onClick={() => handleQuickAction("alert")}
-              className="w-full flex items-center space-x-3 p-3 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors font-medium text-sm text-orange-900 border border-orange-200">
+              className="w-full flex items-center space-x-3 p-3 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors font-medium text-sm text-orange-900 border border-orange-200"
+            >
               <Bell className="h-4 w-4" />
               <span>Set Alert</span>
             </button>
@@ -606,7 +629,8 @@ const App = () => {
               departmentStats.map((dept) => (
                 <div
                   key={dept.name}
-                  className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg hover:from-gray-100 hover:to-gray-150 transition-all border border-gray-200">
+                  className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg hover:from-gray-100 hover:to-gray-150 transition-all border border-gray-200"
+                >
                   <div className="flex items-center space-x-3 flex-1">
                     <div className="w-3 h-3 rounded-full bg-blue-600"></div>
                     <span className="font-medium text-gray-900">
@@ -665,15 +689,17 @@ const App = () => {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
-                      className={`h-3 rounded-full transition-all ${item.status === "urgent"
+                      className={`h-3 rounded-full transition-all ${
+                        item.status === "urgent"
                           ? "bg-red-600"
                           : item.status === "review"
-                            ? "bg-yellow-600"
-                            : item.status === "approved"
-                              ? "bg-green-600"
-                              : "bg-purple-600"
-                        }`}
-                      style={{ width: `${item.percentage}%` }}></div>
+                          ? "bg-yellow-600"
+                          : item.status === "approved"
+                          ? "bg-green-600"
+                          : "bg-purple-600"
+                      }`}
+                      style={{ width: `${item.percentage}%` }}
+                    ></div>
                   </div>
                 </div>
               ))
@@ -697,7 +723,8 @@ const App = () => {
                 <div
                   key={tag.tag}
                   className="px-4 py-2 bg-gradient-to-r from-pink-50 to-rose-50 text-pink-700 rounded-full border-2 border-pink-300 hover:border-pink-500 transition-all cursor-pointer font-medium text-sm hover:shadow-md"
-                  title={`${tag.count} documents`}>
+                  title={`${tag.count} documents`}
+                >
                   #{tag.tag}
                   <span className="ml-2 text-xs bg-pink-200 px-2 py-0.5 rounded-full">
                     {tag.count}
@@ -725,7 +752,8 @@ const App = () => {
               docTypesStats.map((item, idx) => (
                 <div
                   key={item.type}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                >
                   <div className="flex items-center space-x-3">
                     <div
                       className="w-3 h-3 rounded-full"
@@ -738,7 +766,8 @@ const App = () => {
                           "#8B5CF6",
                           "#EC4899",
                         ][idx % 6],
-                      }}></div>
+                      }}
+                    ></div>
                     <span className="font-medium text-gray-900 text-sm">
                       {item.type}
                     </span>
@@ -767,7 +796,8 @@ const App = () => {
                 <div
                   key={doc._id}
                   onClick={() => handleViewDocument(doc)}
-                  className="p-3 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer border-l-4 border-blue-600">
+                  className="p-3 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer border-l-4 border-blue-600"
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <p className="font-medium text-gray-900 text-sm truncate">
@@ -778,12 +808,14 @@ const App = () => {
                       </p>
                     </div>
                     <span
-                      className={`text-xs font-semibold px-2 py-1 rounded-full ${doc.status === "urgent"
+                      className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        doc.status === "urgent"
                           ? "bg-red-100 text-red-800"
                           : doc.status === "approved"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}>
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
                       {doc.status}
                     </span>
                   </div>
@@ -817,7 +849,8 @@ const App = () => {
             <select
               value={selectedDepartment}
               onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
               {departments.map((dept) => (
                 <option key={dept.id} value={dept.id}>
                   {dept.name}
@@ -827,11 +860,13 @@ const App = () => {
             <select
               value={selectedDocType}
               onChange={(e) => setSelectedDocType(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
               {docTypes.map((type) => (
                 <option
                   key={type}
-                  value={type.toLowerCase().replace(/\s+/g, "-")}>
+                  value={type.toLowerCase().replace(/\s+/g, "-")}
+                >
                   {type}
                 </option>
               ))}
@@ -843,7 +878,8 @@ const App = () => {
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-blue-400"
-            disabled={loading}>
+            disabled={loading}
+          >
             {loading && activeTab === "documents" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -878,7 +914,8 @@ const App = () => {
           documents.map((doc) => (
             <div
               key={doc._id}
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+            >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
@@ -888,7 +925,8 @@ const App = () => {
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(
                         doc.status
-                      )}`}>
+                      )}`}
+                    >
                       {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                     </span>
                   </div>
@@ -916,7 +954,8 @@ const App = () => {
                       <span
                         key={tag}
                         className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-md hover:bg-gray-200 cursor-pointer transition-colors"
-                        onClick={() => setSearchQuery(tag)}>
+                        onClick={() => setSearchQuery(tag)}
+                      >
                         #{tag}
                       </span>
                     ))}
@@ -927,20 +966,24 @@ const App = () => {
                   <button
                     onClick={() => handleViewDocument(doc)}
                     className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    title="View Document">
+                    title="View Document"
+                  >
                     <Eye className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDownloadDocument(doc)}
                     className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
-                    title="Download Document">
+                    title="Download Document"
+                  >
                     <Download className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleStarDocument(doc)}
-                    className={`p-2 text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500 ${doc.starred ? "text-yellow-500" : ""
-                      }`}
-                    title="Star Document">
+                    className={`p-2 text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500 ${
+                      doc.starred ? "text-yellow-500" : ""
+                    }`}
+                    title="Star Document"
+                  >
                     <Star
                       className="h-4 w-4"
                       fill={doc.starred ? "currentColor" : "none"}
@@ -949,7 +992,8 @@ const App = () => {
                   <button
                     onClick={() => handleDeleteDocument(doc._id)}
                     className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
-                    title="Delete Document">
+                    title="Delete Document"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -1050,7 +1094,8 @@ const App = () => {
             <button
               onClick={handleSemanticSearch}
               disabled={semanticLoading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center space-x-2">
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
               {semanticLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1087,7 +1132,8 @@ const App = () => {
                   <div
                     key={result._id}
                     onClick={() => handleViewDocument(result)}
-                    className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer group">
+                    className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer group"
+                  >
                     <div className="flex items-start justify-between mb-2">
                       <h5 className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
                         {result.title}
@@ -1120,7 +1166,8 @@ const App = () => {
                         {result.tags.map((tag) => (
                           <span
                             key={tag}
-                            className="px-2 py-1 bg-white text-gray-700 text-xs rounded-md border border-gray-200 group-hover:bg-blue-50 transition-colors">
+                            className="px-2 py-1 bg-white text-gray-700 text-xs rounded-md border border-gray-200 group-hover:bg-blue-50 transition-colors"
+                          >
                             #{tag}
                           </span>
                         ))}
@@ -1193,7 +1240,8 @@ const App = () => {
 
             <button
               onClick={() => setActiveTab("documents")}
-              className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
               Search Documents
             </button>
           </div>
@@ -1216,7 +1264,8 @@ const App = () => {
               <button
                 key={term}
                 onClick={() => setSemanticQuery(term)}
-                className="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full hover:bg-blue-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 border border-blue-200">
+                className="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full hover:bg-blue-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 border border-blue-200"
+              >
                 {term}
               </button>
             ))}
@@ -1239,7 +1288,8 @@ const App = () => {
               <button
                 key={term}
                 onClick={() => setSearchQuery(term)}
-                className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500">
+                className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
                 {term}
               </button>
             ))}
@@ -1495,7 +1545,8 @@ const App = () => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl border-2 border-green-300">
                   <div className="text-4xl font-bold text-green-600 mb-2">
-                    {dashboardStats?.processing_efficiency || 94.2}%
+                    {dashboardStats?.processing_efficiency || 100}%
+                    
                   </div>
                   <div className="text-sm text-gray-700 font-medium">
                     Auto-processed
@@ -1507,7 +1558,7 @@ const App = () => {
 
                 <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-100 rounded-xl border-2 border-blue-300">
                   <div className="text-4xl font-bold text-blue-600 mb-2">
-                    {dashboardStats?.avg_processing_time || 2.3}h
+                    {dashboardStats?.avg_processing_time_sec || 4.8}s
                   </div>
                   <div className="text-sm text-gray-700 font-medium">
                     Avg Processing Time
@@ -1522,15 +1573,15 @@ const App = () => {
                     {(chartsData?.status.reduce((sum, s) => sum + s.count, 0) ||
                       0) > 0
                       ? Math.round(
-                        ((chartsData.status.find(
-                          (s) => s.status === "approved"
-                        )?.count || 0) /
-                          (chartsData.status.reduce(
-                            (sum, s) => sum + s.count,
-                            0
-                          ) || 1)) *
-                        100
-                      )
+                          ((chartsData.status.find(
+                            (s) => s.status === "approved"
+                          )?.count || 0) /
+                            (chartsData.status.reduce(
+                              (sum, s) => sum + s.count,
+                              0
+                            ) || 1)) *
+                            100
+                        )
                       : 0}
                     %
                   </div>
@@ -1567,7 +1618,8 @@ const App = () => {
                   {chartsData.tags.slice(0, 10).map((tag) => (
                     <div
                       key={tag.tag}
-                      className="px-4 py-2 bg-gradient-to-r from-pink-100 to-rose-100 text-pink-700 rounded-full border-2 border-pink-300 font-medium text-sm shadow-sm hover:shadow-md transition-all">
+                      className="px-4 py-2 bg-gradient-to-r from-pink-100 to-rose-100 text-pink-700 rounded-full border-2 border-pink-300 font-medium text-sm shadow-sm hover:shadow-md transition-all"
+                    >
                       #{tag.tag}
                       <span className="ml-2 font-bold">{tag.count}</span>
                     </div>
@@ -1591,11 +1643,11 @@ const App = () => {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">K</span>
+                  <span className="text-white font-bold text-sm">I</span>
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">
-                    KMRL DocIntel
+                    IntelliDocs
                   </h1>
                   <p className="text-xs text-gray-500">
                     Document Intelligence System
@@ -1652,10 +1704,12 @@ const App = () => {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === item.id
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                    activeTab === item.id
                       ? "bg-blue-50 text-blue-700 border border-blue-200"
                       : "text-gray-700 hover:bg-gray-100"
-                    }`}>
+                  }`}
+                >
                   <item.icon className="h-5 w-5" />
                   <span className="font-medium">{item.name}</span>
                 </button>
@@ -1670,19 +1724,19 @@ const App = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">New Documents</span>
-                  <span className="font-medium text-gray-900">47</span>
+                  <span className="font-medium text-gray-900">{todaySummary.new_documents}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Processed</span>
-                  <span className="font-medium text-green-600">42</span>
+                  <span className="font-medium text-green-600">{todaySummary.processed}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Pending</span>
-                  <span className="font-medium text-orange-600">5</span>
+                  <span className="font-medium text-orange-600">{todaySummary.pending}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Urgent</span>
-                  <span className="font-medium text-red-600">3</span>
+                  <span className="font-medium text-red-600">{todaySummary.urgent}</span>
                 </div>
               </div>
             </div>
@@ -1717,7 +1771,7 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
   const [activeTab, setActiveTab] = React.useState("summary");
   const [currentPdfPage, setCurrentPdfPage] = React.useState(1);
   const pdfIframeRef = React.useRef(null);
-  
+
   const viewerUrl = React.useMemo(() => {
     if (doc?.file_url) {
       return `${API_BASE_URL}${doc.file_url}`;
@@ -1728,46 +1782,50 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
     return null;
   }, [doc]);
   const isImagePreview = doc?.file_mime?.startsWith("image/");
-  const isPdfFile = doc?.file_mime === "application/pdf" || doc?.file_name?.endsWith(".pdf");
-  
+  const isPdfFile =
+    doc?.file_mime === "application/pdf" || doc?.file_name?.endsWith(".pdf");
+
   // Function to navigate to a specific PDF page
-  const navigateToPdfPage = React.useCallback((pageNumber, event) => {
-    // Prevent any event propagation
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    
-    if (!isPdfFile || !viewerUrl || !pageNumber) {
-      if (!isPdfFile) {
-        alert("Page navigation is only available for PDF documents.");
+  const navigateToPdfPage = React.useCallback(
+    (pageNumber, event) => {
+      // Prevent any event propagation
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
       }
-      return;
-    }
-    
-    setCurrentPdfPage(pageNumber);
-    
-    // Update iframe src with page number
-    const pageUrl = `${viewerUrl}#page=${pageNumber}`;
-    
-    // If iframe exists, update its src
-    if (pdfIframeRef.current) {
-      pdfIframeRef.current.src = pageUrl;
-    }
-    
-    // Don't switch tabs - PDF viewer is always visible on the left
-    // Just highlight the PDF viewer briefly to show it updated
-    setTimeout(() => {
-      const pdfViewer = document.querySelector('[data-pdf-viewer]');
-      if (pdfViewer) {
-        pdfViewer.style.transition = 'box-shadow 0.3s ease';
-        pdfViewer.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.5)';
-        setTimeout(() => {
-          pdfViewer.style.boxShadow = '';
-        }, 500);
+
+      if (!isPdfFile || !viewerUrl || !pageNumber) {
+        if (!isPdfFile) {
+          alert("Page navigation is only available for PDF documents.");
+        }
+        return;
       }
-    }, 100);
-  }, [isPdfFile, viewerUrl]);
+
+      setCurrentPdfPage(pageNumber);
+
+      // Update iframe src with page number
+      const pageUrl = `${viewerUrl}#page=${pageNumber}`;
+
+      // If iframe exists, update its src
+      if (pdfIframeRef.current) {
+        pdfIframeRef.current.src = pageUrl;
+      }
+
+      // Don't switch tabs - PDF viewer is always visible on the left
+      // Just highlight the PDF viewer briefly to show it updated
+      setTimeout(() => {
+        const pdfViewer = document.querySelector("[data-pdf-viewer]");
+        if (pdfViewer) {
+          pdfViewer.style.transition = "box-shadow 0.3s ease";
+          pdfViewer.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.5)";
+          setTimeout(() => {
+            pdfViewer.style.boxShadow = "";
+          }, 500);
+        }
+      }, 100);
+    },
+    [isPdfFile, viewerUrl]
+  );
 
   const tabs = [
     { id: "summary", label: "Summary", icon: FileText },
@@ -1932,10 +1990,12 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-2 sm:p-4"
-      onClick={onClose}>
+      onClick={onClose}
+    >
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}>
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* ===== HEADER ===== */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-300 p-4 sm:p-6 flex-shrink-0">
           <div className="flex items-start justify-between gap-4">
@@ -1963,12 +2023,14 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
                   {doc.type}
                 </span>
                 <span
-                  className={`px-2 py-1 text-white rounded font-semibold ${doc.status === "urgent"
+                  className={`px-2 py-1 text-white rounded font-semibold ${
+                    doc.status === "urgent"
                       ? "bg-red-600"
                       : doc.status === "approved"
-                        ? "bg-green-600"
-                        : "bg-yellow-600"
-                    }`}>
+                      ? "bg-green-600"
+                      : "bg-yellow-600"
+                  }`}
+                >
                   {doc.status.toUpperCase()}
                 </span>
                 <span className="px-2 py-1 bg-white rounded border border-gray-200 text-xs">
@@ -1980,7 +2042,8 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
             {/* Close Button */}
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-all flex-shrink-0">
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-all flex-shrink-0"
+            >
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -1990,7 +2053,10 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
         <div className="flex-1 flex overflow-hidden">
           {/* ===== LEFT SIDEBAR: PDF VIEWER ===== */}
           {isPdfFile && viewerUrl && (
-            <div className="w-1/2 border-r border-gray-300 bg-gray-50 flex flex-col flex-shrink-0" data-pdf-viewer>
+            <div
+              className="w-1/2 border-r border-gray-300 bg-gray-50 flex flex-col flex-shrink-0"
+              data-pdf-viewer
+            >
               <div className="bg-white border-b border-gray-300 p-4 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -2007,12 +2073,14 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
                   {viewerUrl && (
                     <button
                       onClick={() => {
-                        const url = isPdfFile && currentPdfPage > 0 
-                          ? `${viewerUrl}#page=${currentPdfPage}`
-                          : viewerUrl;
+                        const url =
+                          isPdfFile && currentPdfPage > 0
+                            ? `${viewerUrl}#page=${currentPdfPage}`
+                            : viewerUrl;
                         window.open(url, "_blank", "noopener");
                       }}
-                      className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1 hover:bg-blue-50 rounded-lg transition-colors">
+                      className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1 hover:bg-blue-50 rounded-lg transition-colors"
+                    >
                       Open in new tab
                     </button>
                   )}
@@ -2022,9 +2090,13 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
                 <iframe
                   ref={pdfIframeRef}
                   title="Document preview"
-                  src={`${viewerUrl}${isPdfFile && currentPdfPage > 0 ? `#page=${currentPdfPage}` : '#toolbar=0&navpanes=0'}`}
+                  src={`${viewerUrl}${
+                    isPdfFile && currentPdfPage > 0
+                      ? `#page=${currentPdfPage}`
+                      : "#toolbar=0&navpanes=0"
+                  }`}
                   className="w-full h-full bg-white"
-                  style={{ border: 'none' }}
+                  style={{ border: "none" }}
                 />
               </div>
               {viewerUrl && (
@@ -2033,13 +2105,15 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
                     href={viewerUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
                     View Full Document
                   </a>
                   <a
                     href={viewerUrl}
                     download={doc.file_name || "document.pdf"}
-                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
                     Download Original
                   </a>
                 </div>
@@ -2056,10 +2130,12 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${activeTab === tab.id
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${
+                      activeTab === tab.id
                         ? "bg-blue-100 text-blue-700 border-b-2 border-blue-600"
                         : "text-gray-600 hover:bg-gray-100"
-                      }`}>
+                    }`}
+                  >
                     <tab.icon className="h-4 w-4" />
                     <span className="hidden sm:inline">{tab.label}</span>
                   </button>
@@ -2070,410 +2146,450 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
             {/* ===== CONTENT AREA ===== */}
             <div className="flex-1 overflow-y-auto">
               <div className="p-4 sm:p-6">
-            {/* Summary Tab */}
-            {activeTab === "summary" && (
-              <div className="space-y-6">
-                {/* Main Summary */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-6 rounded-xl">
-                  <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-lg">
-                    <Zap className="h-5 w-5 text-blue-600" />
-                    AI-Generated Summary
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed">{doc.summary}</p>
-                </div>
-
-                {/* Tags */}
-                {doc.tags && doc.tags.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <Tag className="h-5 w-5 text-pink-600" />
-                      Keywords & Tags
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {doc.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-4 py-2 bg-pink-100 text-pink-700 text-sm font-medium rounded-full border border-pink-300 hover:bg-pink-200 transition-colors">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Key Figures */}
-                {doc.figures_data && doc.figures_data.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-800 mb-4">
-                      Key Figures & Metrics
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {doc.figures_data.map((fig, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-lg border-2 border-orange-200">
-                          <p className="text-sm text-gray-600 mb-2">
-                            {fig.description}
-                          </p>
-                          <p className="text-3xl font-bold text-orange-600">
-                            {fig.values?.[0] || "N/A"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1 capitalize">
-                            Type: {fig.type}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Image Preview for non-PDF files */}
-                {!isPdfFile && viewerUrl && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-blue-600" />
-                        Original Document Preview
+                {/* Summary Tab */}
+                {activeTab === "summary" && (
+                  <div className="space-y-6">
+                    {/* Main Summary */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-6 rounded-xl">
+                      <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2 text-lg">
+                        <Zap className="h-5 w-5 text-blue-600" />
+                        AI-Generated Summary
                       </h3>
-                      {viewerUrl && (
-                        <button
-                          onClick={() => window.open(viewerUrl, "_blank", "noopener")}
-                          className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                          Open in new tab
-                        </button>
-                      )}
+                      <p className="text-gray-700 leading-relaxed">
+                        {doc.summary}
+                      </p>
                     </div>
-                    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden min-h-[400px]">
-                      {isImagePreview ? (
-                        <img
-                          src={viewerUrl}
-                          alt="Original document preview"
-                          className="w-full h-full object-contain max-h-[600px]"
-                        />
-                      ) : (
-                        <p className="text-sm text-gray-500 text-center px-4">
-                          Document preview available in left panel for PDFs.
-                        </p>
-                      )}
-                    </div>
+
+                    {/* Tags */}
+                    {doc.tags && doc.tags.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                          <Tag className="h-5 w-5 text-pink-600" />
+                          Keywords & Tags
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {doc.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="px-4 py-2 bg-pink-100 text-pink-700 text-sm font-medium rounded-full border border-pink-300 hover:bg-pink-200 transition-colors"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Key Figures */}
+                    {doc.figures_data && doc.figures_data.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-gray-800 mb-4">
+                          Key Figures & Metrics
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {doc.figures_data.map((fig, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-lg border-2 border-orange-200"
+                            >
+                              <p className="text-sm text-gray-600 mb-2">
+                                {fig.description}
+                              </p>
+                              <p className="text-3xl font-bold text-orange-600">
+                                {fig.values?.[0] || "N/A"}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1 capitalize">
+                                Type: {fig.type}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Image Preview for non-PDF files */}
+                    {!isPdfFile && viewerUrl && (
+                      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                            <FileText className="h-5 w-5 text-blue-600" />
+                            Original Document Preview
+                          </h3>
+                          {viewerUrl && (
+                            <button
+                              onClick={() =>
+                                window.open(viewerUrl, "_blank", "noopener")
+                              }
+                              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              Open in new tab
+                            </button>
+                          )}
+                        </div>
+                        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden min-h-[400px]">
+                          {isImagePreview ? (
+                            <img
+                              src={viewerUrl}
+                              alt="Original document preview"
+                              className="w-full h-full object-contain max-h-[600px]"
+                            />
+                          ) : (
+                            <p className="text-sm text-gray-500 text-center px-4">
+                              Document preview available in left panel for PDFs.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Charts Tab */}
-            {activeTab === "charts" && (
-              <div className="space-y-8">
-                {doc.charts && doc.charts.length > 0 ? (
-                  doc.charts.map((chart, idx) => {
-                    const chartData = generateChartData(chart);
-                    if (!chartData) return null;
+                {/* Charts Tab */}
+                {activeTab === "charts" && (
+                  <div className="space-y-8">
+                    {doc.charts && doc.charts.length > 0 ? (
+                      doc.charts.map((chart, idx) => {
+                        const chartData = generateChartData(chart);
+                        if (!chartData) return null;
 
-                    return (
-                      <div
-                        key={idx}
-                        className="bg-white p-6 rounded-xl border-2 border-gray-200 hover:shadow-lg transition-shadow">
-                        <div className="flex items-center justify-between mb-6">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <h3 className="text-lg font-semibold text-gray-900">
-                                {chart.title}
-                              </h3>
-                              {isPdfFile && chart.page_number !== undefined && chart.page_number !== null && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    navigateToPdfPage(chart.page_number, e);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-full border border-blue-200 transition-colors cursor-pointer"
-                                  title={`View on page ${chart.page_number}`}>
-                                  <FileText className="h-3 w-3" />
-                                  Page {chart.page_number}
-                                </button>
+                        return (
+                          <div
+                            key={idx}
+                            className="bg-white p-6 rounded-xl border-2 border-gray-200 hover:shadow-lg transition-shadow"
+                          >
+                            <div className="flex items-center justify-between mb-6">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <h3 className="text-lg font-semibold text-gray-900">
+                                    {chart.title}
+                                  </h3>
+                                  {isPdfFile &&
+                                    chart.page_number !== undefined &&
+                                    chart.page_number !== null && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          navigateToPdfPage(
+                                            chart.page_number,
+                                            e
+                                          );
+                                        }}
+                                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-full border border-blue-200 transition-colors cursor-pointer"
+                                        title={`View on page ${chart.page_number}`}
+                                      >
+                                        <FileText className="h-3 w-3" />
+                                        Page {chart.page_number}
+                                      </button>
+                                    )}
+                                </div>
+                                {chart.description && (
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    {chart.description}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
+                                {chart.chart_type.toUpperCase()}
+                              </span>
+                            </div>
+
+                            <div className="h-80 mb-6">
+                              {chart.chart_type === "bar" && (
+                                <Bar data={chartData} options={chartOptions} />
+                              )}
+                              {chart.chart_type === "line" && (
+                                <Line data={chartData} options={chartOptions} />
+                              )}
+                              {chart.chart_type === "pie" && (
+                                <div className="flex justify-center">
+                                  <div className="w-80 h-80">
+                                    <Pie
+                                      data={chartData}
+                                      options={chartOptions}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              {chart.chart_type === "area" && (
+                                <Line data={chartData} options={chartOptions} />
                               )}
                             </div>
-                            {chart.description && (
-                              <p className="text-sm text-gray-600 mt-1">
-                                {chart.description}
-                              </p>
-                            )}
-                          </div>
-                          <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
-                            {chart.chart_type.toUpperCase()}
-                          </span>
-                        </div>
 
-                        <div className="h-80 mb-6">
-                          {chart.chart_type === "bar" && (
-                            <Bar data={chartData} options={chartOptions} />
-                          )}
-                          {chart.chart_type === "line" && (
-                            <Line data={chartData} options={chartOptions} />
-                          )}
-                          {chart.chart_type === "pie" && (
-                            <div className="flex justify-center">
-                              <div className="w-80 h-80">
-                                <Pie data={chartData} options={chartOptions} />
+                            {/* Data Points Table */}
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                              <h4 className="font-semibold text-gray-800 mb-3">
+                                Data Points
+                              </h4>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b-2 border-gray-300">
+                                      <th className="text-left py-2 px-3 font-semibold text-gray-700">
+                                        Label
+                                      </th>
+                                      <th className="text-right py-2 px-3 font-semibold text-gray-700">
+                                        Value
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {chart.data_points.map((point, pidx) => (
+                                      <tr
+                                        key={pidx}
+                                        className="border-b border-gray-200 hover:bg-gray-50"
+                                      >
+                                        <td className="py-2 px-3 text-gray-900">
+                                          {point.label}
+                                        </td>
+                                        <td className="py-2 px-3 text-right font-bold text-blue-600">
+                                          {point.value}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
                               </div>
                             </div>
-                          )}
-                          {chart.chart_type === "area" && (
-                            <Line data={chartData} options={chartOptions} />
-                          )}
-                        </div>
-
-                        {/* Data Points Table */}
-                        <div className="mt-6 pt-6 border-t border-gray-200">
-                          <h4 className="font-semibold text-gray-800 mb-3">
-                            Data Points
-                          </h4>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="border-b-2 border-gray-300">
-                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                    Label
-                                  </th>
-                                  <th className="text-right py-2 px-3 font-semibold text-gray-700">
-                                    Value
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {chart.data_points.map((point, pidx) => (
-                                  <tr
-                                    key={pidx}
-                                    className="border-b border-gray-200 hover:bg-gray-50">
-                                    <td className="py-2 px-3 text-gray-900">
-                                      {point.label}
-                                    </td>
-                                    <td className="py-2 px-3 text-right font-bold text-blue-600">
-                                      {point.value}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
                           </div>
-                        </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-12 text-gray-500">
+                        <BarChart3 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                        <p>No charts available for this document</p>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    <BarChart3 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p>No charts available for this document</p>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Tables Tab */}
-            {activeTab === "tables" && (
-              <div className="space-y-8">
-                {doc.tables_data && doc.tables_data.length > 0 ? (
-                  doc.tables_data.map((tableObj, tableIdx) => {
-                    if (!tableObj?.data || tableObj.data.length === 0)
-                      return null;
+                {/* Tables Tab */}
+                {activeTab === "tables" && (
+                  <div className="space-y-8">
+                    {doc.tables_data && doc.tables_data.length > 0 ? (
+                      doc.tables_data.map((tableObj, tableIdx) => {
+                        if (!tableObj?.data || tableObj.data.length === 0)
+                          return null;
 
-                    const tableData = tableObj.data;
-                    const headerRow = tableData[0];
-                    const dataRows = tableData.slice(1);
-                    const headerColor = getHeaderColor(tableIdx);
-                    const isExpanded =
-                      expandedTableIndex === tableIdx || dataRows.length <= 5;
+                        const tableData = tableObj.data;
+                        const headerRow = tableData[0];
+                        const dataRows = tableData.slice(1);
+                        const headerColor = getHeaderColor(tableIdx);
+                        const isExpanded =
+                          expandedTableIndex === tableIdx ||
+                          dataRows.length <= 5;
 
-                    return (
-                      <div
-                        key={tableIdx}
-                        className="border-2 border-gray-300 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
-                        {/* Table Caption */}
-                        <div
-                          className={`${headerColor.bg} ${headerColor.text} border-b-2 border-gray-300 px-6 py-4`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <h4 className="text-lg font-bold">
-                                📋 {tableObj.caption || `Table ${tableIdx + 1}`}
-                              </h4>
-                              {isPdfFile && tableObj.page_number !== undefined && tableObj.page_number !== null && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    navigateToPdfPage(tableObj.page_number, e);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-full border border-white/30 transition-colors cursor-pointer"
-                                  title={`View on page ${tableObj.page_number}`}>
-                                  <FileText className="h-3 w-3" />
-                                  Page {tableObj.page_number}
-                                </button>
-                              )}
-                            </div>
-                            {dataRows.length > 5 && (
-                              <button
-                                onClick={() =>
-                                  setExpandedTableIndex(
-                                    expandedTableIndex === tableIdx
-                                      ? null
-                                      : tableIdx
-                                  )
-                                }
-                                className={`p-2 rounded-lg ${headerColor.light} text-gray-700 hover:opacity-80 transition-all`}
-                                title={isExpanded ? "Collapse" : "Expand"}>
-                                <ChevronDown
-                                  className={`h-5 w-5 transform transition-transform ${isExpanded ? "rotate-180" : ""
-                                    }`}
-                                />
-                              </button>
-                            )}
-                          </div>
-                          <p className="text-sm opacity-90 mt-1">
-                            📊 {dataRows.length} row
-                            {dataRows.length !== 1 ? "s" : ""} •{" "}
-                            {headerRow.length} column
-                            {headerRow.length !== 1 ? "s" : ""}
-                            {tableObj.page_number && isPdfFile && (
-                              <span className="ml-2">• Page {tableObj.page_number}</span>
-                            )}
-                          </p>
-                        </div>
-
-                        {/* Table Content */}
-                        {isExpanded && (
-                          <div className="overflow-x-auto">
-                            <table className="w-full">
-                              <thead>
-                                <tr
-                                  className={`${headerColor.bg} divide-x divide-gray-300`}>
-                                  {headerRow.map((headerCell, cellIdx) => (
-                                    <th
-                                      key={cellIdx}
-                                      className={`${headerColor.text} px-4 py-3 text-left text-xs font-bold uppercase tracking-wider`}>
-                                      {headerCell}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {dataRows.map((row, rowIdx) => (
-                                  <tr
-                                    key={rowIdx}
-                                    className={`hover:${headerColor.light
-                                      } transition-colors divide-x divide-gray-200 ${rowIdx % 2 === 0
-                                        ? "bg-white"
-                                        : "bg-gray-50"
-                                      }`}>
-                                    {row.map((cell, cellIdx) => (
-                                      <td
-                                        key={cellIdx}
-                                        className="px-4 py-3 text-sm text-gray-700 font-medium">
-                                        {cell}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-
-                        {!isExpanded && dataRows.length > 5 && (
+                        return (
                           <div
-                            className={`${headerColor.light} px-6 py-4 text-center text-sm text-gray-600 font-medium`}>
-                            Click expand to view {dataRows.length} rows
+                            key={tableIdx}
+                            className="border-2 border-gray-300 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow"
+                          >
+                            {/* Table Caption */}
+                            <div
+                              className={`${headerColor.bg} ${headerColor.text} border-b-2 border-gray-300 px-6 py-4`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <h4 className="text-lg font-bold">
+                                    📋{" "}
+                                    {tableObj.caption ||
+                                      `Table ${tableIdx + 1}`}
+                                  </h4>
+                                  {isPdfFile &&
+                                    tableObj.page_number !== undefined &&
+                                    tableObj.page_number !== null && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          navigateToPdfPage(
+                                            tableObj.page_number,
+                                            e
+                                          );
+                                        }}
+                                        className="inline-flex items-center gap-1 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-full border border-white/30 transition-colors cursor-pointer"
+                                        title={`View on page ${tableObj.page_number}`}
+                                      >
+                                        <FileText className="h-3 w-3" />
+                                        Page {tableObj.page_number}
+                                      </button>
+                                    )}
+                                </div>
+                                {dataRows.length > 5 && (
+                                  <button
+                                    onClick={() =>
+                                      setExpandedTableIndex(
+                                        expandedTableIndex === tableIdx
+                                          ? null
+                                          : tableIdx
+                                      )
+                                    }
+                                    className={`p-2 rounded-lg ${headerColor.light} text-gray-700 hover:opacity-80 transition-all`}
+                                    title={isExpanded ? "Collapse" : "Expand"}
+                                  >
+                                    <ChevronDown
+                                      className={`h-5 w-5 transform transition-transform ${
+                                        isExpanded ? "rotate-180" : ""
+                                      }`}
+                                    />
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-sm opacity-90 mt-1">
+                                📊 {dataRows.length} row
+                                {dataRows.length !== 1 ? "s" : ""} •{" "}
+                                {headerRow.length} column
+                                {headerRow.length !== 1 ? "s" : ""}
+                                {tableObj.page_number && isPdfFile && (
+                                  <span className="ml-2">
+                                    • Page {tableObj.page_number}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+
+                            {/* Table Content */}
+                            {isExpanded && (
+                              <div className="overflow-x-auto">
+                                <table className="w-full">
+                                  <thead>
+                                    <tr
+                                      className={`${headerColor.bg} divide-x divide-gray-300`}
+                                    >
+                                      {headerRow.map((headerCell, cellIdx) => (
+                                        <th
+                                          key={cellIdx}
+                                          className={`${headerColor.text} px-4 py-3 text-left text-xs font-bold uppercase tracking-wider`}
+                                        >
+                                          {headerCell}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {dataRows.map((row, rowIdx) => (
+                                      <tr
+                                        key={rowIdx}
+                                        className={`hover:${
+                                          headerColor.light
+                                        } transition-colors divide-x divide-gray-200 ${
+                                          rowIdx % 2 === 0
+                                            ? "bg-white"
+                                            : "bg-gray-50"
+                                        }`}
+                                      >
+                                        {row.map((cell, cellIdx) => (
+                                          <td
+                                            key={cellIdx}
+                                            className="px-4 py-3 text-sm text-gray-700 font-medium"
+                                          >
+                                            {cell}
+                                          </td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+
+                            {!isExpanded && dataRows.length > 5 && (
+                              <div
+                                className={`${headerColor.light} px-6 py-4 text-center text-sm text-gray-600 font-medium`}
+                              >
+                                Click expand to view {dataRows.length} rows
+                              </div>
+                            )}
                           </div>
-                        )}
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-12 text-gray-500">
+                        <Archive className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                        <p>No tables available for this document</p>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    <Archive className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p>No tables available for this document</p>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Details Tab */}
-            {activeTab === "details" && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border-2 border-blue-300">
-                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">
-                      Department
-                    </p>
-                    <p className="text-lg text-blue-900 font-bold mt-2">
-                      {doc.department}
-                    </p>
-                  </div>
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border-2 border-green-300">
-                    <p className="text-xs font-bold text-green-700 uppercase tracking-wide">
-                      Document Type
-                    </p>
-                    <p className="text-lg text-green-900 font-bold mt-2">
-                      {doc.type}
-                    </p>
-                  </div>
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border-2 border-purple-300">
-                    <p className="text-xs font-bold text-purple-700 uppercase tracking-wide">
-                      Status
-                    </p>
-                    <p className="text-lg text-purple-900 font-bold mt-2">
-                      {doc.status}
-                    </p>
-                  </div>
-                  <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border-2 border-orange-300">
-                    <p className="text-xs font-bold text-orange-700 uppercase tracking-wide">
-                      Language
-                    </p>
-                    <p className="text-lg text-orange-900 font-bold mt-2">
-                      {doc.language}
-                    </p>
-                  </div>
-                  <div className="bg-gradient-to-br from-rose-50 to-rose-100 p-4 rounded-lg border-2 border-rose-300">
-                    <p className="text-xs font-bold text-rose-700 uppercase tracking-wide">
-                      Source
-                    </p>
-                    <p className="text-lg text-rose-900 font-bold mt-2">
-                      {doc.source}
-                    </p>
-                  </div>
-                  <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-4 rounded-lg border-2 border-cyan-300">
-                    <p className="text-xs font-bold text-cyan-700 uppercase tracking-wide">
-                      Date Created
-                    </p>
-                    <p className="text-lg text-cyan-900 font-bold mt-2">
-                      {new Date(doc.date).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
+                {/* Details Tab */}
+                {activeTab === "details" && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border-2 border-blue-300">
+                        <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">
+                          Department
+                        </p>
+                        <p className="text-lg text-blue-900 font-bold mt-2">
+                          {doc.department}
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border-2 border-green-300">
+                        <p className="text-xs font-bold text-green-700 uppercase tracking-wide">
+                          Document Type
+                        </p>
+                        <p className="text-lg text-green-900 font-bold mt-2">
+                          {doc.type}
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border-2 border-purple-300">
+                        <p className="text-xs font-bold text-purple-700 uppercase tracking-wide">
+                          Status
+                        </p>
+                        <p className="text-lg text-purple-900 font-bold mt-2">
+                          {doc.status}
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border-2 border-orange-300">
+                        <p className="text-xs font-bold text-orange-700 uppercase tracking-wide">
+                          Language
+                        </p>
+                        <p className="text-lg text-orange-900 font-bold mt-2">
+                          {doc.language}
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-br from-rose-50 to-rose-100 p-4 rounded-lg border-2 border-rose-300">
+                        <p className="text-xs font-bold text-rose-700 uppercase tracking-wide">
+                          Source
+                        </p>
+                        <p className="text-lg text-rose-900 font-bold mt-2">
+                          {doc.source}
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-4 rounded-lg border-2 border-cyan-300">
+                        <p className="text-xs font-bold text-cyan-700 uppercase tracking-wide">
+                          Date Created
+                        </p>
+                        <p className="text-lg text-cyan-900 font-bold mt-2">
+                          {new Date(doc.date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="bg-gray-50 p-6 rounded-lg border-2 border-gray-300">
-                  <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
-                    Document ID
-                  </p>
-                  <p className="text-xs text-gray-600 font-mono break-all bg-white p-3 rounded border border-gray-300">
-                    {doc._id}
-                  </p>
-                </div>
+                    <div className="bg-gray-50 p-6 rounded-lg border-2 border-gray-300">
+                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
+                        Document ID
+                      </p>
+                      <p className="text-xs text-gray-600 font-mono break-all bg-white p-3 rounded border border-gray-300">
+                        {doc._id}
+                      </p>
+                    </div>
 
-                {doc.content && (
-                  <div className="bg-gray-50 p-6 rounded-lg border-2 border-gray-300">
-                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
-                      Full Extracted Content
-                    </p>
-                    <pre className="text-xs text-gray-700 bg-white p-4 rounded border border-gray-300 max-h-64 overflow-y-auto whitespace-pre-wrap font-mono break-words">
-                      {doc.content.substring(0, 1500)}
-                      {doc.content.length > 1500 ? "..." : ""}
-                    </pre>
+                    {doc.content && (
+                      <div className="bg-gray-50 p-6 rounded-lg border-2 border-gray-300">
+                        <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">
+                          Full Extracted Content
+                        </p>
+                        <pre className="text-xs text-gray-700 bg-white p-4 rounded border border-gray-300 max-h-64 overflow-y-auto whitespace-pre-wrap font-mono break-words">
+                          {doc.content.substring(0, 1500)}
+                          {doc.content.length > 1500 ? "..." : ""}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
               </div>
             </div>
           </div>
@@ -2483,14 +2599,16 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
         <div className="border-t border-gray-300 bg-gray-50 p-4 flex-shrink-0 flex gap-2 justify-end flex-wrap">
           <button
             onClick={handlePrint}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all">
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all"
+          >
             <Printer className="h-4 w-4" />
             <span className="hidden sm:inline">Print</span>
           </button>
           <button
             onClick={handleDownloadWithLoading}
             disabled={isDownloading}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-all">
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-all"
+          >
             {isDownloading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -2505,7 +2623,8 @@ const DocumentViewModal = ({ doc, onClose, getStatusColor }) => {
           </button>
           <button
             onClick={onClose}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all">
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all"
+          >
             <X className="h-4 w-4" />
             <span className="hidden sm:inline">Close</span>
           </button>
